@@ -28,7 +28,7 @@ test("server-renders the finished PICK ONE machine", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
-test("ships weighted picks, preference testing, persistence, and GitHub Pages", async () => {
+test("ships visible paced decisions, preference testing, persistence, and GitHub Pages", async () => {
   const [page, css, layout, config, workflow, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -43,8 +43,15 @@ test("ships weighted picks, preference testing, persistence, and GitHub Pages", 
   assert.match(page, /getRandomValues/);
   assert.match(page, /pick-one-history/);
   assert.match(page, /有点失望/);
+  assert.match(page, /tournamentMinimum: 4600/);
+  assert.match(page, /quick: 3600/);
+  assert.match(page, /tournament\.rounds\.slice\(0, index \+ 2\)/);
+  assert.match(page, /PROCESS \/ 过程可见/);
   assert.match(page, /aria-live="polite"/);
-  assert.match(css, /transition: transform 4\.2s/);
+  assert.match(css, /transition: transform 5s/);
+  assert.match(css, /\.process-strip/);
+  assert.doesNotMatch(css, /\.running-overlay/);
+  assert.match(css, /\.result-card \{ position: relative/);
   assert.match(css, /@media \(max-width:560px\)/);
   assert.match(css, /prefers-reduced-motion:reduce/);
   assert.match(layout, /PICK ONE｜选择困难决策机/);

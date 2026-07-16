@@ -5,6 +5,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type Mode = "wheel" | "quick" | "tournament";
 type Phase = "idle" | "running" | "result";
 
+const runTimings = {
+  wheel: 5200,
+  quick: 3600,
+  tournamentMinimum: 4600,
+  tournamentStep: 1300,
+} as const;
+
 type Choice = {
   id: string;
   text: string;
@@ -186,6 +193,7 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rotationRef = useRef(0);
   const timersRef = useRef<number[]>([]);
+  const runIdRef = useRef(0);
   const [choices, setChoices] = useState<Choice[]>(defaultChoices);
   const [newChoice, setNewChoice] = useState("");
   const [mode, setMode] = useState<Mode>("wheel");
@@ -194,6 +202,7 @@ export default function Home() {
   const [rotation, setRotation] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [rounds, setRounds] = useState<string[][]>([]);
+  const [tournamentRoundCount, setTournamentRoundCount] = useState(0);
   const [reaction, setReaction] = useState<"none" | "accepted" | "rejected">("none");
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const [soundOn, setSoundOn] = useState(true);
@@ -239,16 +248,27 @@ export default function Home() {
 
   useEffect(() => () => timersRef.current.forEach((timer) => window.clearTimeout(timer)), []);
 
-  const later = (callback: () => void, delay: number) => {
-    const timer = window.setTimeout(callback, delay);
+  const clearScheduled = () => {
+    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current = [];
+  };
+
+  const later = (callback: () => void, delay: number, runId: number) => {
+    const timer = window.setTimeout(() => {
+      if (runIdRef.current === runId) callback();
+      timersRef.current = timersRef.current.filter((item) => item !== timer);
+    }, delay);
     timersRef.current.push(timer);
   };
 
   const resetResult = () => {
+    runIdRef.current += 1;
+    clearScheduled();
     setPhase("idle");
     setResult(null);
     setReaction("none");
     setRounds([]);
+    setTournamentRoundCount(0);
     setShareStatus("");
   };
 
@@ -278,26 +298,39 @@ export default function Home() {
     resetResult();
   };
 
-  const reveal = (winner: Choice, delay: number) => {
+  const reveal = (winner: Choice, delay: number, runId: number) => {
     later(() => {
       setResult(winner);
       setPhase("result");
       playSequence(soundOn, [440, 554, 659, 880]);
-    }, delay);
+    }, delay, runId);
   };
 
   const decide = () => {
     if (activeChoices.length < 2 || phase === "running") return;
+    clearScheduled();
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
     setReaction("none");
     setResult(null);
     setShareStatus("");
+    setRounds([]);
+    setTournamentRoundCount(0);
     setPhase("running");
     playSequence(soundOn, [220, 260, 300]);
 
     if (mode === "tournament") {
       const tournament = buildTournament(activeChoices);
-      setRounds(tournament.rounds);
-      reveal(tournament.winner, 2200);
+      setTournamentRoundCount(tournament.rounds.length);
+      setRounds(tournament.rounds.slice(0, 1));
+      tournament.rounds.slice(1).forEach((_, index) => {
+        later(() => setRounds(tournament.rounds.slice(0, index + 2)), (index + 1) * runTimings.tournamentStep, runId);
+      });
+      const bracketDuration = Math.max(
+        runTimings.tournamentMinimum,
+        (tournament.rounds.length - 1) * runTimings.tournamentStep + 1100,
+      );
+      reveal(tournament.winner, bracketDuration, runId);
       return;
     }
 
@@ -309,9 +342,9 @@ export default function Home() {
       const nextRotation = base + correction;
       rotationRef.current = nextRotation;
       setRotation(nextRotation);
-      reveal(winner, 4400);
+      reveal(winner, runTimings.wheel, runId);
     } else {
-      reveal(winner, 1350);
+      reveal(winner, runTimings.quick, runId);
     }
   };
 
@@ -450,7 +483,7 @@ export default function Home() {
                 {rounds.length > 0 ? (
                   <div className="bracket-rounds">
                     {rounds.map((round, roundIndex) => (
-                      <div key={roundIndex}><small>{roundIndex === rounds.length - 1 ? "FINAL" : `ROUND ${roundIndex + 1}`}</small>{round.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}</div>
+                      <div key={roundIndex}><small>{roundIndex === 0 ? "START" : roundIndex === tournamentRoundCount - 1 ? "FINAL" : `ROUND ${roundIndex}`}</small>{round.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}</div>
                     ))}
                   </div>
                 ) : (
@@ -459,7 +492,15 @@ export default function Home() {
               </div>
             )}
 
-            {phase === "running" && <div className="running-overlay" role="status" aria-live="polite"><span>{mode === "tournament" ? "正在进行多轮对决" : mode === "quick" ? "正在压制你的反悔冲动" : "概率引擎全速旋转"}</span><i>CALCULATING•••</i></div>}
+            {phase === "running" && (
+              <div className="process-strip" role="status" aria-live="polite">
+                <div>
+                  <small>PROCESS / 过程可见</small>
+                  <span>{mode === "tournament" ? `正在展示第 ${rounds.length} / ${tournamentRoundCount} 阶段` : mode === "quick" ? "候选项持续滚动，机器不会提前揭晓" : "轮盘正在旋转并自然减速"}</span>
+                </div>
+                <i>{mode === "tournament" ? "逐轮晋级" : mode === "quick" ? "至少 3.6 秒" : "至少 5.2 秒"}</i>
+              </div>
+            )}
 
             {phase === "result" && result && (
               <div className={`result-card reaction-${reaction}`} role="status" aria-live="polite">
