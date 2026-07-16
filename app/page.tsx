@@ -493,12 +493,8 @@ export default function Home() {
             )}
 
             {phase === "running" && (
-              <div className="process-strip" role="status" aria-live="polite">
-                <div>
-                  <small>PROCESS / 过程可见</small>
-                  <span>{mode === "tournament" ? `正在展示第 ${rounds.length} / ${tournamentRoundCount} 阶段` : mode === "quick" ? "候选项持续滚动，机器不会提前揭晓" : "轮盘正在旋转并自然减速"}</span>
-                </div>
-                <i>{mode === "tournament" ? "逐轮晋级" : mode === "quick" ? "至少 3.6 秒" : "至少 5.2 秒"}</i>
+              <div className="process-line" role="status" aria-live="polite">
+                <span className="visually-hidden">决策进行中，结果将在过程结束后揭晓</span>
               </div>
             )}
 

@@ -46,10 +46,10 @@ test("ships visible paced decisions, preference testing, persistence, and GitHub
   assert.match(page, /tournamentMinimum: 4600/);
   assert.match(page, /quick: 3600/);
   assert.match(page, /tournament\.rounds\.slice\(0, index \+ 2\)/);
-  assert.match(page, /PROCESS \/ 过程可见/);
+  assert.doesNotMatch(page, /轮盘正在旋转并自然减速|候选项持续滚动|正在展示第/);
   assert.match(page, /aria-live="polite"/);
   assert.match(css, /transition: transform 5s/);
-  assert.match(css, /\.process-strip/);
+  assert.match(css, /\.process-line/);
   assert.doesNotMatch(css, /\.running-overlay/);
   assert.match(css, /\.result-card \{ position: relative/);
   assert.match(css, /@media \(max-width:560px\)/);
